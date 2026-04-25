@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2b79d3">
+    <title>لا يوجد اتصال</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #eef3fa;
+            --card: rgba(255, 255, 255, 0.96);
+            --text: #173251;
+            --muted: #62738d;
+            --primary: #2b79d3;
+            --danger: #e06464;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            font-family: "Tajawal", "Segoe UI", Tahoma, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top right, rgba(66, 147, 234, 0.18), transparent 24%),
+                linear-gradient(180deg, #fbfcff 0%, #f5f8fd 48%, var(--bg) 100%);
+        }
+        .card {
+            width: min(560px, 100%);
+            padding: 28px;
+            border-radius: 28px;
+            background: var(--card);
+            box-shadow: 0 26px 52px rgba(15, 42, 89, 0.1);
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 34px;
+            padding: 0 14px;
+            border-radius: 999px;
+            background: rgba(224, 100, 100, 0.12);
+            color: var(--danger);
+            font-weight: 700;
+        }
+        h1 { margin: 16px 0 10px; font-size: clamp(1.8rem, 1.2rem + 1vw, 2.2rem); }
+        p { margin: 0; color: var(--muted); line-height: 1.9; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px;
+            padding: 0 18px;
+            border-radius: 16px;
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .btn-primary { color: #fff; background: linear-gradient(145deg, #3184df, #0f4d92); }
+        .btn-light { color: var(--text); background: rgba(236, 244, 255, 0.94); }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <span class="badge">وضع عدم الاتصال</span>
+        <h1>تعذر الوصول إلى الخادم الآن</h1>
+        <p>يمكنك متابعة تصفح بعض الملفات الثابتة التي تم تخزينها مسبقًا، ثم إعادة المحاولة عند عودة الاتصال. الصفحات التي تحتاج بيانات لحظية من قاعدة البيانات لن تعمل بالكامل حتى يعود الإنترنت أو الخادم.</p>
+        <div class="actions">
+            <a class="btn btn-primary" href="javascript:location.reload();">إعادة المحاولة</a>
+            <a class="btn btn-light" href="login.php">العودة إلى تسجيل الدخول</a>
+        </div>
+    </div>
+</body>
+</html>
