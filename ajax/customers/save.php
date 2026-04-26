@@ -98,12 +98,18 @@ log_activity(
     $customerId
 );
 
-Response::success('تم حفظ العميل.', [
-    'id' => $customerId,
-    'full_name' => $payload['full_name'],
-    'code' => $payload['code'],
-    'marketer_id' => $payload['marketer_id'],
+flash('success', 'تم حفظ العميل.');
+echo json_encode([
+    'success' => true,
+    'message' => 'تم حفظ العميل.',
+    'data' => [
+        'id' => $customerId,
+        'full_name' => $payload['full_name'],
+        'code' => $payload['code'],
+        'marketer_id' => $payload['marketer_id'],
+    ]
 ]);
+exit;
 function generateCustomerCode(): string
 {
     do {

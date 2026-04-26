@@ -456,43 +456,46 @@ if ($view === 'form') {
                             <?php endforeach; ?>
                         </select>
                         <small class="field-help">في البيع النقدي يمكن تركه بدون عميل. أما البيع الآجل فيجب ربطه بعميل فعلي.</small>
-                        <button type="button" class="btn btn-light mt-1" data-toggle-customer-quick-form>عميل جديد</button>
+                        <button type="button" class="btn btn-light mt-1" id="toggleCustomerQuickFormBtn">عميل جديد</button>
                     </div>
-                    <div class="sales-quick-customer" data-customer-quick-panel hidden>
+                    <div class="sales-quick-customer" id="customerQuickPanel" hidden>
                         <div class="sales-quick-customer-head">
                             <strong>إضافة عميل سريع</strong>
-                            <button type="button" class="btn btn-light" data-close-customer-quick-form>إلغاء</button>
+                            <button type="button" class="btn btn-light" id="closeCustomerQuickFormBtn">إلغاء</button>
                         </div>
                         <div class="sales-quick-customer-grid">
                             <div>
                                 <label>اسم العميل</label>
-                                <input type="text" name="quick_customer_full_name" placeholder="اسم العميل">
-                            </div>
+<div style="position: relative;">
+    <input type="text" id="quickCustomerFullName" placeholder="اسم العميل" autocomplete="off">
+    <div id="customerSearchResults" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; background: white; border: 1px solid #ddd; border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
+</div>
+<small class="field-help" id="customerSearchStatus" style="color: #666; font-size: 0.75rem;"></small>                            </div>
                             <div>
                                 <label>الهاتف</label>
-                                <input type="text" name="quick_customer_phone" placeholder="رقم الهاتف">
+                                <input type="text" id="quickCustomerPhone" placeholder="رقم الهاتف">
                             </div>
                             <div>
                                 <label>التصنيف</label>
-                                <input type="text" name="quick_customer_category" placeholder="مثال: جملة">
+                                <input type="text" id="quickCustomerCategory" placeholder="مثال: جملة">
                             </div>
                             <div>
                                 <label>السقف الائتماني</label>
-                                <input type="number" step="0.01" name="quick_customer_credit_limit" value="0">
+                                <input type="number" step="0.01" id="quickCustomerCreditLimit" value="0">
                             </div>
-                            <input type="hidden" name="quick_customer_marketer_id" value="">
+                            <input type="hidden" id="quickCustomerMarketerId" value="">
                         </div>
-            <div class="sales-quick-customer-actions">
-                <?php if (Auth::can('customers.create') || Auth::can('sales.create')): ?>
-                    <button type="button" class="btn btn-primary" data-save-quick-customer>
-                        <i class="fa-solid fa-plus"></i>
-                        <span>حفظ العميل واختياره</span>
-                    </button>
-                    <small class="muted">يمكنك إضافة عميل جديد مباشرة من هنا</small>
-                <?php else: ?>
-                    <small class="muted">إنشاء عميل سريع: يحتاج صلاحية "إضافة عميل" أو "إنشاء فاتورة بيع"</small>
-                <?php endif; ?>
-                </div>
+                        <div class="sales-quick-customer-actions">
+                            <?php if (Auth::can('customers.create') || Auth::can('sales.create')): ?>
+                                <button type="button" class="btn btn-primary" id="saveQuickCustomerBtn">
+                                    <i class="fa-solid fa-plus"></i>
+                                    <span>حفظ العميل واختياره</span>
+                                </button>
+                                <small class="muted">يمكنك إضافة عميل جديد مباشرة من هنا</small>
+                            <?php else: ?>
+                                <small class="muted">إنشاء عميل سريع: يحتاج صلاحية "إضافة عميل" أو "إنشاء فاتورة بيع"</small>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <div>
                         <label>الفرع</label>
@@ -630,7 +633,7 @@ if ($view === 'form') {
                 <!-- Full-screen page loading (shown during save) -->
                 <div class="page-loading" id="pageLoading" hidden>
                     <div class="page-loading__spinner"></div>
-                    <p class="page-loading__text">جاري حفظ الفاتورة和对atal...</p>
+                    <p class="page-loading__text">جاري حفظ الفاتورة...</p>
                 </div>
             </aside>
 
@@ -789,7 +792,7 @@ if ($view === 'form') {
 
     <div class="card">
         <div class="table-wrap">
-            <table>
+            <table class="table">
                 <thead>
                     <tr>
                         <th>الفاتورة</th>
@@ -897,153 +900,582 @@ if ($view === 'form') {
 <?php endif; ?>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function() {
+    // ========================
+    // 1. العناصر الأساسية
+    // ========================
+    const customerSelect = document.getElementById('customer_id');
     const marketerSelect = document.querySelector('select[name="marketer_id"]');
     const warehouseSelect = document.querySelector('select[name="warehouse_id"]');
     const warehouseWrap = warehouseSelect ? warehouseSelect.closest('div') : null;
+    const quickCustomerMarketerInput = document.getElementById('quickCustomerMarketerId');
+    const cartItems = document.getElementById('salesItems');
+    
+    // عناصر نافذة العميل السريع
+    const toggleQuickCustomerBtn = document.getElementById('toggleCustomerQuickFormBtn');
+    const closeQuickCustomerBtn = document.getElementById('closeCustomerQuickFormBtn');
+    const quickCustomerPanel = document.getElementById('customerQuickPanel');
+    const saveQuickCustomerBtn = document.getElementById('saveQuickCustomerBtn');
+    
+    // حقول نموذج العميل السريع
+    const quickFullName = document.getElementById('quickCustomerFullName');
+    const quickPhone = document.getElementById('quickCustomerPhone');
+    const quickCategory = document.getElementById('quickCustomerCategory');
+    const quickCreditLimit = document.getElementById('quickCustomerCreditLimit');
+    const quickMarketerId = document.getElementById('quickCustomerMarketerId');
 
-    const customerSelect = document.querySelector('select[name="customer_id"]');
-    const quickCustomerMarketerInput = document.querySelector('input[name="quick_customer_marketer_id"]');
-
+    // ========================
+    // 2. الدوال المساعدة
+    // ========================
+    function showToast(message, type, title) {
+        let toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.className = 'toast-container';
+            toastContainer.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999;';
+            document.body.appendChild(toastContainer);
+        }
+        
+        const borderColor = type === 'success' ? '#10b981' : '#ef4444';
+        const titleText = title || (type === 'success' ? 'نجاح' : 'خطأ');
+        
+        const toast = document.createElement('div');
+        toast.style.cssText = 
+            'background: white; border-radius: 8px; padding: 12px 20px; margin-bottom: 10px; ' +
+            'box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-right: 4px solid ' + borderColor + '; ' +
+            'direction: rtl; font-family: inherit;';
+        toast.innerHTML = '<strong>' + titleText + '</strong><br>' + message;
+        
+        toastContainer.appendChild(toast);
+        
+        setTimeout(function() {
+            toast.remove();
+            if (toastContainer.children.length === 0) toastContainer.remove();
+        }, 3000);
+    }
+    
     function syncCustomerMarketer() {
         if (!customerSelect || !marketerSelect) return;
-
         const option = customerSelect.options[customerSelect.selectedIndex];
         const customerMarketerId = option && option.dataset ? (option.dataset.marketerId || '') : '';
-
         if (customerMarketerId !== '') {
             marketerSelect.value = customerMarketerId;
             syncSaleMode();
         }
     }
-
+    
     function syncQuickCustomerMarketer() {
-        if (!quickCustomerMarketerInput || !marketerSelect) return;
-        quickCustomerMarketerInput.value = marketerSelect.value || '';
+        if (quickMarketerId && marketerSelect) {
+            quickMarketerId.value = marketerSelect.value || '';
+        }
     }
-
+    
     function syncSaleMode() {
         if (!marketerSelect || !warehouseSelect || !warehouseWrap) return;
-
         const option = marketerSelect.options[marketerSelect.selectedIndex];
         const type = option && option.dataset ? (option.dataset.type || '') : '';
         const warehouseId = option && option.dataset ? (option.dataset.warehouseId || '') : '';
-
-        if (type === 'marketer') {
-            warehouseWrap.style.display = '';
-            warehouseSelect.disabled = false;
-            if (warehouseId) {
-                warehouseSelect.value = warehouseId;
+        
+        warehouseWrap.style.display = '';
+        warehouseSelect.disabled = false;
+        if (warehouseId) warehouseSelect.value = warehouseId;
+    }
+    
+    // دوال السلة
+    function recalculateCart() {
+        const rows = document.querySelectorAll('[data-sales-item]');
+        const subtotalInput = document.querySelector('input[name="subtotal"]');
+        const discountInput = document.querySelector('input[name="discount_value"]');
+        const totalInput = document.querySelector('input[name="total_amount"]');
+        const paidInput = document.querySelector('input[name="paid_amount"]');
+        const dueInput = document.querySelector('input[name="due_amount"]');
+        const emptyState = cartItems ? cartItems.querySelector('[data-sales-empty]') : null;
+        const cartItemCountBadge = document.getElementById('cartItemCountBadge');
+        
+        let subtotal = 0;
+        rows.forEach(function(row) {
+            const qtyInput = row.querySelector('input[name="items[][quantity]"]');
+            const unitPriceInput = row.querySelector('input[name="items[][unit_price]"]');
+            const discountRowInput = row.querySelector('input[name="items[][discount_value]"]');
+            const totalEl = row.querySelector('.sales-cart-item-total');
+            
+            const qty = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+            const unitPrice = parseFloat(unitPriceInput ? unitPriceInput.value : 0) || 0;
+            const rowDiscount = parseFloat(discountRowInput ? discountRowInput.value : 0) || 0;
+            const rowTotal = Math.max(0, (qty * unitPrice) - rowDiscount);
+            subtotal += rowTotal;
+            if (totalEl) totalEl.textContent = rowTotal.toFixed(2);
+        });
+        
+        const generalDiscount = parseFloat(discountInput ? discountInput.value : 0) || 0;
+        const total = Math.max(0, subtotal - generalDiscount);
+        const paid = parseFloat(paidInput ? paidInput.value : 0) || 0;
+        const due = Math.max(0, total - paid);
+        
+        if (subtotalInput) subtotalInput.value = subtotal.toFixed(2);
+        if (totalInput) totalInput.value = total.toFixed(2);
+        if (dueInput) dueInput.value = due.toFixed(2);
+        if (emptyState) emptyState.hidden = rows.length > 0;
+        if (cartItemCountBadge) cartItemCountBadge.textContent = rows.length + ' ' + (rows.length === 1 ? 'صنف' : 'أصناف');
+    }
+    
+    function bindRowEvents(row) {
+        if (!row) return;
+        const qtyInput = row.querySelector('input[name="items[][quantity]"]');
+        const unitPriceInput = row.querySelector('input[name="items[][unit_price]"]');
+        const discountRowInput = row.querySelector('input[name="items[][discount_value]"]');
+        const removeBtn = row.querySelector('[data-remove-row]');
+        
+        [qtyInput, unitPriceInput, discountRowInput].forEach(function(input) {
+            if (input) {
+                input.addEventListener('input', recalculateCart);
+                input.addEventListener('change', recalculateCart);
             }
-        } else {
-            warehouseWrap.style.display = '';
-            warehouseSelect.disabled = false;
+        });
+        if (removeBtn) removeBtn.addEventListener('click', function() { row.remove(); recalculateCart(); });
+    }
+    
+    function getProductPrice(product) {
+        if (!product) return 0;
+        const tierSelect = document.querySelector('select[name="pricing_tier"]');
+        const tier = tierSelect ? tierSelect.value : 'retail';
+        if (tier === 'wholesale') return parseFloat(product.wholesale_price || 0);
+        if (tier === 'half_wholesale') return parseFloat(product.half_wholesale_price || 0);
+        return parseFloat(product.retail_price || 0);
+    }
+    
+    function addProductToCart(product) {
+        if (!cartItems) return;
+        const template = document.getElementById('salesCartRowTemplate');
+        if (!template) return;
+        const emptyState = cartItems.querySelector('[data-sales-empty]');
+        const clone = template.content.cloneNode(true);
+        const row = clone.querySelector('[data-sales-item]');
+        if (!row) return;
+        
+        const productIdInput = row.querySelector('input[name="items[][product_id]"]');
+        const productUnitInput = row.querySelector('input[name="items[][product_unit_id]"]');
+        const batchInput = row.querySelector('input[name="items[][batch_id]"]');
+        const nameEl = row.querySelector('.sales-cart-item-name');
+        const metaEl = row.querySelector('.sales-cart-item-meta');
+        const qtyInput = row.querySelector('input[name="items[][quantity]"]');
+        const unitPriceInput = row.querySelector('input[name="items[][unit_price]"]');
+        const discountRowInput = row.querySelector('input[name="items[][discount_value]"]');
+        const stockEl = row.querySelector('.sales-cart-item-stock');
+        
+        if (productIdInput) productIdInput.value = product.id || '';
+        if (productUnitInput) productUnitInput.value = product.default_sale_unit_id || '';
+        if (batchInput) batchInput.value = '';
+        if (nameEl) nameEl.textContent = product.name || 'بدون اسم';
+        if (metaEl) {
+            const parts = [];
+            if (product.code) parts.push('الكود: ' + product.code);
+            if (product.category_name) parts.push(product.category_name);
+            if (product.sale_unit_label) parts.push('الوحدة: ' + product.sale_unit_label);
+            metaEl.textContent = parts.join(' • ');
         }
+        if (qtyInput) qtyInput.value = 1;
+        if (unitPriceInput) unitPriceInput.value = getProductPrice(product).toFixed(2);
+        if (discountRowInput) discountRowInput.value = 0;
+        if (stockEl) stockEl.textContent = product.sale_unit_label ? ('وحدة البيع: ' + product.sale_unit_label) : '';
+        
+        cartItems.appendChild(clone);
+        const allRows = cartItems.querySelectorAll('[data-sales-item]');
+        const lastRow = allRows[allRows.length - 1];
+        bindRowEvents(lastRow);
+        if (emptyState) emptyState.hidden = true;
+        recalculateCart();
+    }
+    
+    // ========================
+    // 3. البحث المباشر عن العملاء أثناء الكتابة
+    // ========================
+    const customerSearchResults = document.getElementById('customerSearchResults');
+    const customerSearchStatus = document.getElementById('customerSearchStatus');
+    let searchTimeout;
+
+    if (quickFullName && customerSearchResults) {
+        quickFullName.addEventListener('input', function() {
+            const searchTerm = this.value.trim();
+            
+            clearTimeout(searchTimeout);
+            
+            if (searchTerm.length < 2) {
+                customerSearchResults.style.display = 'none';
+                customerSearchResults.innerHTML = '';
+                if (customerSearchStatus) customerSearchStatus.textContent = '';
+                return;
+            }
+            
+            searchTimeout = setTimeout(function() {
+                fetch('ajax/customers/search.php?q=' + encodeURIComponent(searchTerm))
+                    .then(function(response) { return response.json(); })
+                    .then(function(data) {
+                        if (data.results && data.results.length > 0) {
+                            let html = '';
+                            data.results.forEach(function(customer) {
+                                html += '<div class="search-result-item" style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0;" data-id="' + customer.id + '" data-full-name="' + customer.full_name + '" data-phone="' + (customer.phone || '') + '" data-category="' + (customer.category || '') + '">';
+                                html += '<div style="font-weight: bold; color: #333;">' + customer.full_name + '</div>';
+                                if (customer.phone || customer.category) {
+                                    html += '<div style="font-size: 0.8rem; color: #666; margin-top: 2px;">';
+                                    if (customer.phone) html += '📱 ' + customer.phone;
+                                    if (customer.phone && customer.category) html += ' | ';
+                                    if (customer.category) html += '📂 ' + customer.category;
+                                    html += '</div>';
+                                }
+                                html += '</div>';
+                            });
+                            
+                            customerSearchResults.innerHTML = html;
+                            customerSearchResults.style.display = 'block';
+                            
+                            if (customerSearchStatus) {
+                                customerSearchStatus.textContent = 'تم العثور على ' + data.results.length + ' عميل مشابه';
+                                customerSearchStatus.style.color = '#f59e0b';
+                            }
+                            
+                            customerSearchResults.querySelectorAll('.search-result-item').forEach(function(item) {
+                                item.addEventListener('click', function() {
+                                    if (quickFullName) quickFullName.value = this.dataset.fullName;
+                                    if (quickPhone) quickPhone.value = this.dataset.phone || '';
+                                    if (quickCategory) quickCategory.value = this.dataset.category || '';
+                                    customerSearchResults.style.display = 'none';
+                                    if (customerSearchStatus) {
+                                        customerSearchStatus.textContent = 'تم اختيار عميل موجود من القائمة';
+                                        customerSearchStatus.style.color = '#10b981';
+                                    }
+                                });
+                                
+                                item.addEventListener('mouseenter', function() { this.style.background = '#f0f7ff'; });
+                                item.addEventListener('mouseleave', function() { this.style.background = 'white'; });
+                            });
+                        } else {
+                            customerSearchResults.style.display = 'none';
+                            customerSearchResults.innerHTML = '';
+                            if (customerSearchStatus) {
+                                customerSearchStatus.textContent = 'لا يوجد عملاء بهذا الاسم - يمكنك إضافة عميل جديد';
+                                customerSearchStatus.style.color = '#10b981';
+                            }
+                        }
+                    })
+                    .catch(function(error) {
+                        console.error('Search error:', error);
+                        customerSearchResults.style.display = 'none';
+                    });
+            }, 300);
+        });
+        
+        document.addEventListener('click', function(e) {
+            if (quickFullName && customerSearchResults) {
+                if (!quickFullName.contains(e.target) && !customerSearchResults.contains(e.target)) {
+                    customerSearchResults.style.display = 'none';
+                }
+            }
+        });
+        
+        quickFullName.addEventListener('keydown', function(e) {
+            const results = customerSearchResults.querySelectorAll('.search-result-item');
+            if (results.length === 0 || customerSearchResults.style.display === 'none') return;
+            
+            const current = customerSearchResults.querySelector('.search-result-item.active');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (!current) {
+                    results[0].classList.add('active');
+                    results[0].style.background = '#e3f2fd';
+                } else {
+                    const next = current.nextElementSibling;
+                    if (next) {
+                        current.classList.remove('active');
+                        current.style.background = 'white';
+                        next.classList.add('active');
+                        next.style.background = '#e3f2fd';
+                    }
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (current) {
+                    const prev = current.previousElementSibling;
+                    if (prev) {
+                        current.classList.remove('active');
+                        current.style.background = 'white';
+                        prev.classList.add('active');
+                        prev.style.background = '#e3f2fd';
+                    }
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (current) {
+                    current.click();
+                }
+            }
+        });
     }
 
-    const editSaleId = <?= (int) $saleId; ?>;
-    const editItems = <?= json_encode($editSaleItems ?: [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-    const editSale = <?= $editSale ? json_encode($editSale, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : 'null'; ?>;
+    // ========================
+    // 4. فتح وإغلاق نافذة العميل السريع
+    // ========================
+    if (toggleQuickCustomerBtn && quickCustomerPanel) {
+        const newToggleBtn = toggleQuickCustomerBtn.cloneNode(true);
+        toggleQuickCustomerBtn.parentNode.replaceChild(newToggleBtn, toggleQuickCustomerBtn);
+        
+        newToggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            quickCustomerPanel.hidden = false;
+            syncQuickCustomerMarketer();
+        });
+    }
+    
+    if (closeQuickCustomerBtn && quickCustomerPanel) {
+        const newCloseBtn = closeQuickCustomerBtn.cloneNode(true);
+        closeQuickCustomerBtn.parentNode.replaceChild(newCloseBtn, closeQuickCustomerBtn);
+        
+        newCloseBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            quickCustomerPanel.hidden = true;
+            if (quickFullName) quickFullName.value = '';
+            if (quickPhone) quickPhone.value = '';
+            if (quickCategory) quickCategory.value = '';
+            if (quickCreditLimit) quickCreditLimit.value = '0';
+            if (quickMarketerId) quickMarketerId.value = '';
+            if (customerSearchResults) customerSearchResults.style.display = 'none';
+            if (customerSearchStatus) customerSearchStatus.textContent = '';
+        });
+    }
+// ========================
+// 5. حفظ العميل الجديد مع منع التكرار
+// ========================
+if (saveQuickCustomerBtn) {
+    const newSaveBtn = saveQuickCustomerBtn.cloneNode(true);
+    saveQuickCustomerBtn.parentNode.replaceChild(newSaveBtn, saveQuickCustomerBtn);
 
+    newSaveBtn.addEventListener('click', function() {
+        const fullName = quickFullName ? quickFullName.value.trim() : '';
+        const phone = quickPhone ? quickPhone.value.trim() : '';
+        const category = quickCategory ? quickCategory.value.trim() : '';
+        const creditLimit = quickCreditLimit ? quickCreditLimit.value : 0;
+        const marketerId = quickMarketerId ? quickMarketerId.value : '';
+
+        if (!fullName) {
+            showToast('برجاء إدخال اسم العميل', 'error', 'خطأ');
+            if (quickFullName) quickFullName.focus();
+            return;
+        }
+
+        if (!phone) {
+            showToast('برجاء إدخال رقم الهاتف', 'error', 'خطأ');
+            if (quickPhone) quickPhone.focus();
+            return;
+        }
+
+        newSaveBtn.disabled = true;
+        const originalHtml = newSaveBtn.innerHTML;
+        newSaveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري التحقق...';
+
+        fetch('ajax/customers/search.php?q=' + encodeURIComponent(fullName))
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(searchData) {
+                if (searchData.results && searchData.results.length > 0) {
+                    const exactMatch = searchData.results.find(function(customer) {
+                        const sameName =
+                            customer.full_name &&
+                            customer.full_name.trim().toLowerCase() === fullName.toLowerCase();
+
+                        const samePhone =
+                            phone !== '' &&
+                            customer.phone &&
+                            customer.phone.trim() === phone;
+
+                        return sameName || samePhone;
+                    });
+
+                    if (exactMatch) {
+                        let warningMessage = 'هذا العميل موجود مسبقاً: ' + exactMatch.full_name;
+
+                        if (exactMatch.phone) {
+                            warningMessage += ' | هاتف: ' + exactMatch.phone;
+                        }
+
+                        showToast(warningMessage, 'error', 'عميل مكرر');
+
+                        newSaveBtn.disabled = false;
+                        newSaveBtn.innerHTML = originalHtml;
+
+                        if (quickFullName) quickFullName.focus();
+                        return;
+                    }
+                }
+
+                saveCustomer();
+            })
+            .catch(function() {
+                saveCustomer();
+            });
+
+        function saveCustomer() {
+            newSaveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الحفظ...';
+
+            const formData = new FormData();
+            formData.append('full_name', fullName);
+            formData.append('phone', phone);
+            formData.append('category', category);
+            formData.append('credit_limit', creditLimit);
+            formData.append('status', 'active');
+            formData.append('quick_create', '1');
+
+            if (marketerId) {
+                formData.append('marketer_id', marketerId);
+            }
+
+            const tokenInput = document.querySelector('form[data-sales-pos] input[name="_token"]');
+            if (tokenInput && tokenInput.value) {
+                formData.append('_token', tokenInput.value);
+            }
+
+            fetch('ajax/customers/save.php', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(result) {
+                if (result.success && result.data && result.data.id) {
+                    showToast('تم حفظ العميل بنجاح', 'success', 'نجاح');
+
+                    if (customerSelect) {
+                        const option = document.createElement('option');
+                        option.value = result.data.id;
+                        option.textContent = result.data.full_name || fullName;
+
+                        if (result.data.marketer_id) {
+                            option.dataset.marketerId = result.data.marketer_id;
+                        }
+
+                        customerSelect.appendChild(option);
+                        customerSelect.value = result.data.id;
+                        customerSelect.dispatchEvent(new Event('change'));
+                    }
+
+                    if (quickFullName) quickFullName.value = '';
+                    if (quickPhone) quickPhone.value = '';
+                    if (quickCategory) quickCategory.value = '';
+                    if (quickCreditLimit) quickCreditLimit.value = '0';
+                    if (quickMarketerId) quickMarketerId.value = '';
+                    if (quickCustomerPanel) quickCustomerPanel.hidden = true;
+                    if (customerSearchResults) customerSearchResults.style.display = 'none';
+                    if (customerSearchStatus) customerSearchStatus.textContent = '';
+
+                } else {
+                    let errorMessage = result.message || 'حدث خطأ أثناء حفظ العميل';
+
+                    if (
+                        errorMessage.includes('Duplicate') ||
+                        errorMessage.includes('مكرر') ||
+                        errorMessage.includes('موجود')
+                    ) {
+                        errorMessage = 'هذا العميل موجود مسبقاً ولا يمكن تكراره.';
+                    }
+
+                    showToast(errorMessage, 'error', 'خطأ');
+                }
+            })
+            .catch(function(err) {
+                console.error('Save customer error:', err);
+                showToast('خطأ في الاتصال بالخادم', 'error', 'خطأ');
+            })
+            .finally(function() {
+                newSaveBtn.disabled = false;
+                newSaveBtn.innerHTML = originalHtml;
+            });
+        }
+    });
+}
+    
+    // ========================
+    // 6. باقي الكود (منتجات، تعديل، فلتر، أحداث)
+    // ========================
+    if (customerSelect) {
+        customerSelect.addEventListener('change', syncCustomerMarketer);
+    }
+    
     if (marketerSelect) {
-        marketerSelect.addEventListener('change', function () {
+        marketerSelect.addEventListener('change', function() {
             syncSaleMode();
             syncQuickCustomerMarketer();
         });
         syncSaleMode();
         syncQuickCustomerMarketer();
     }
-
-    if (customerSelect) {
-        customerSelect.addEventListener('change', syncCustomerMarketer);
-    }
-
-    const cartItems = document.getElementById('salesItems');
+    
+    // تحميل بيانات التعديل
+    const editSaleId = <?= (int) $saleId; ?>;
+    const editItems = <?= json_encode($editSaleItems ?: [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+    const editSale = <?= $editSale ? json_encode($editSale, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : 'null'; ?>;
+    
     if (editSaleId && editSale && editItems && editItems.length > 0 && cartItems) {
         const invoiceNoInput = document.querySelector('input[name="invoice_no"]');
         if (invoiceNoInput) invoiceNoInput.value = editSale.invoice_no || '';
-
         if (customerSelect) customerSelect.value = editSale.customer_id || '';
-
         const branchSelect = document.querySelector('select[name="branch_id"]');
         if (branchSelect) branchSelect.value = editSale.branch_id || '';
-
-        const whSelect = document.querySelector('select[name="warehouse_id"]');
-        if (whSelect) whSelect.value = editSale.warehouse_id || '';
-
+        if (warehouseSelect) warehouseSelect.value = editSale.warehouse_id || '';
         if (marketerSelect) marketerSelect.value = editSale.marketer_id || '';
-
         const pricingSelect = document.querySelector('select[name="pricing_tier"]');
         if (pricingSelect) pricingSelect.value = editSale.pricing_tier || 'wholesale';
-
         const paymentSelect = document.querySelector('select[name="payment_method"]');
         if (paymentSelect) paymentSelect.value = editSale.payment_method || 'cash';
-
         const subtotalInput = document.querySelector('input[name="subtotal"]');
         if (subtotalInput) subtotalInput.value = editSale.subtotal || 0;
-
         const discountInput = document.querySelector('input[name="discount_value"]');
         if (discountInput) discountInput.value = editSale.discount_value || 0;
-
         const totalInput = document.querySelector('input[name="total_amount"]');
         if (totalInput) totalInput.value = editSale.total_amount || 0;
-
         const paidInput = document.querySelector('input[name="paid_amount"]');
         if (paidInput) paidInput.value = editSale.paid_amount || 0;
-
         const dueInput = document.querySelector('input[name="due_amount"]');
         if (dueInput) dueInput.value = editSale.due_amount || 0;
-
         const notesTextarea = document.querySelector('textarea[name="notes"]');
         if (notesTextarea) notesTextarea.value = editSale.notes || '';
-
+        
         const template = document.getElementById('salesCartRowTemplate');
-
         if (template) {
-            cartItems.querySelectorAll('[data-sales-item]').forEach(function (item) {
-                item.remove();
-            });
-
-            editItems.forEach(function (item) {
+            cartItems.querySelectorAll('[data-sales-item]').forEach(function(item) { item.remove(); });
+            editItems.forEach(function(item) {
                 const clone = template.content.cloneNode(true);
                 const row = clone.querySelector('[data-sales-item]');
                 if (!row) return;
-
                 const productIdInput = row.querySelector('input[name="items[][product_id]"]');
                 const productUnitInput = row.querySelector('input[name="items[][product_unit_id]"]');
                 const batchInput = row.querySelector('input[name="items[][batch_id]"]');
                 const nameEl = row.querySelector('.sales-cart-item-name');
-                const metaEl = row.querySelector('.sales-cart-item-meta');
                 const qtyInput = row.querySelector('input[name="items[][quantity]"]');
                 const unitPriceInput = row.querySelector('input[name="items[][unit_price]"]');
                 const discountRowInput = row.querySelector('input[name="items[][discount_value]"]');
                 const totalEl = row.querySelector('.sales-cart-item-total');
-
                 if (productIdInput) productIdInput.value = item.product_id || '';
                 if (productUnitInput) productUnitInput.value = item.product_unit_id || '';
                 if (batchInput) batchInput.value = item.batch_id || '';
                 if (nameEl) nameEl.textContent = item.product_name || ('صنف #' + (item.product_id || ''));
-                if (metaEl) metaEl.textContent = '';
                 if (qtyInput) qtyInput.value = item.quantity || 1;
                 if (unitPriceInput) unitPriceInput.value = item.unit_price || 0;
                 if (discountRowInput) discountRowInput.value = item.discount_value || 0;
-
                 const total = (parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0)) - parseFloat(item.discount_value || 0);
                 if (totalEl) totalEl.textContent = total.toFixed(2);
-
                 cartItems.appendChild(clone);
             });
-
             if (editItems.length > 0) {
                 const emptyState = cartItems.querySelector('[data-sales-empty]');
                 if (emptyState) emptyState.hidden = true;
             }
         }
-
-        syncSaleMode();
     }
-
-    // معالجة مشكلة أول دخول لنقطة البيع
+    
+    // تحميل المنتجات
     const productsDataEl = document.getElementById('salesProductsData');
     const productsGrid = document.getElementById('salesProductsGrid');
     const productsEmpty = document.getElementById('salesProductsEmpty');
@@ -1052,16 +1484,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const categoryFilters = document.getElementById('salesCategoryFilters');
     const productSearchInput = document.getElementById('salesProductSearch');
     const pricingTierSelect = document.querySelector('select[name="pricing_tier"]');
-
+    
     let salesProducts = [];
     let filteredProducts = [];
     let renderedCount = 0;
     const renderStep = 24;
     let activeCategory = 'all';
-
+    
     function parseProductsData() {
         if (!productsDataEl) return [];
-
         try {
             const raw = productsDataEl.textContent ? productsDataEl.textContent.trim() : '[]';
             if (!raw) return [];
@@ -1072,71 +1503,36 @@ document.addEventListener('DOMContentLoaded', function () {
             return [];
         }
     }
-
-    function getProductPrice(product) {
-        if (!product) return 0;
-
-        const tier = pricingTierSelect ? pricingTierSelect.value : 'retail';
-
-        if (tier === 'wholesale') {
-            return parseFloat(product.wholesale_price || 0);
-        }
-
-        if (tier === 'half_wholesale') {
-            return parseFloat(product.half_wholesale_price || 0);
-        }
-
-        return parseFloat(product.retail_price || 0);
-    }
-
+    
     function getProductText(product) {
-        return [
-            product.name || '',
-            product.code || '',
-            product.category_name || ''
-        ].join(' ').toLowerCase();
+        return [product.name || '', product.code || '', product.category_name || ''].join(' ').toLowerCase();
     }
-
+    
     function filterProducts() {
         const term = productSearchInput ? productSearchInput.value.trim().toLowerCase() : '';
-
-        filteredProducts = salesProducts.filter(function (product) {
+        filteredProducts = salesProducts.filter(function(product) {
             const matchCategory = activeCategory === 'all' || String(product.category_id || '') === String(activeCategory);
             const matchSearch = term === '' || getProductText(product).includes(term);
             return matchCategory && matchSearch;
         });
-
         renderedCount = 0;
-        if (productsGrid) {
-            productsGrid.innerHTML = '';
-        }
-
+        if (productsGrid) productsGrid.innerHTML = '';
         renderMoreProducts();
-
-        if (productsEmpty) {
-            productsEmpty.hidden = filteredProducts.length > 0;
-        }
-
-        if (productsMoreBtn) {
-            productsMoreBtn.hidden = filteredProducts.length <= renderStep;
-        }
+        if (productsEmpty) productsEmpty.hidden = filteredProducts.length > 0;
+        if (productsMoreBtn) productsMoreBtn.hidden = filteredProducts.length <= renderStep;
     }
-
+    
     function renderMoreProducts() {
         if (!productsGrid || !productCardTemplate) return;
-
         const nextItems = filteredProducts.slice(renderedCount, renderedCount + renderStep);
-
-        nextItems.forEach(function (product) {
+        nextItems.forEach(function(product) {
             const clone = productCardTemplate.content.cloneNode(true);
             const card = clone.querySelector('[data-sales-product]');
             if (!card) return;
-
             const nameEl = card.querySelector('.sales-product-name');
             const subtitleEl = card.querySelector('.sales-product-subtitle');
             const stockEl = card.querySelector('[data-stock-target]');
             const priceEl = card.querySelector('[data-price-target]');
-
             if (nameEl) nameEl.textContent = product.name || 'بدون اسم';
             if (subtitleEl) {
                 const parts = [];
@@ -1144,498 +1540,170 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (product.category_name) parts.push(product.category_name);
                 subtitleEl.textContent = parts.join(' • ');
             }
-
             if (stockEl) {
-                stockEl.textContent = product.sale_unit_label
-                    ? ('وحدة البيع: ' + product.sale_unit_label)
-                    : 'جاهز للإضافة';
+                stockEl.textContent = product.sale_unit_label ? ('وحدة البيع: ' + product.sale_unit_label) : 'جاهز للإضافة';
             }
-
-            if (priceEl) {
-                priceEl.textContent = getProductPrice(product).toFixed(2);
-            }
-
+            if (priceEl) priceEl.textContent = getProductPrice(product).toFixed(2);
             card.dataset.product = JSON.stringify(product);
-
-            card.addEventListener('click', function () {
-                addProductToCart(product);
-            });
-
+            card.addEventListener('click', function() { addProductToCart(product); });
             productsGrid.appendChild(clone);
         });
-
         renderedCount += nextItems.length;
-
-        if (productsMoreBtn) {
-            productsMoreBtn.hidden = renderedCount >= filteredProducts.length;
-        }
+        if (productsMoreBtn) productsMoreBtn.hidden = renderedCount >= filteredProducts.length;
     }
-
-    function recalculateCart() {
-        const rows = document.querySelectorAll('[data-sales-item]');
-        const subtotalInput = document.querySelector('input[name="subtotal"]');
-        const discountInput = document.querySelector('input[name="discount_value"]');
-        const totalInput = document.querySelector('input[name="total_amount"]');
-        const paidInput = document.querySelector('input[name="paid_amount"]');
-        const dueInput = document.querySelector('input[name="due_amount"]');
-        const emptyState = cartItems ? cartItems.querySelector('[data-sales-empty]') : null;
-
-        let subtotal = 0;
-
-        rows.forEach(function (row) {
-            const qtyInput = row.querySelector('input[name="items[][quantity]"]');
-            const unitPriceInput = row.querySelector('input[name="items[][unit_price]"]');
-            const discountRowInput = row.querySelector('input[name="items[][discount_value]"]');
-            const totalEl = row.querySelector('.sales-cart-item-total');
-
-            const qty = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
-            const unitPrice = parseFloat(unitPriceInput ? unitPriceInput.value : 0) || 0;
-            const rowDiscount = parseFloat(discountRowInput ? discountRowInput.value : 0) || 0;
-
-            const rowTotal = Math.max(0, (qty * unitPrice) - rowDiscount);
-            subtotal += rowTotal;
-
-            if (totalEl) {
-                totalEl.textContent = rowTotal.toFixed(2);
-            }
-        });
-
-        const generalDiscount = parseFloat(discountInput ? discountInput.value : 0) || 0;
-        const total = Math.max(0, subtotal - generalDiscount);
-        const paid = parseFloat(paidInput ? paidInput.value : 0) || 0;
-        const due = Math.max(0, total - paid);
-
-        if (subtotalInput) subtotalInput.value = subtotal.toFixed(2);
-        if (totalInput) totalInput.value = total.toFixed(2);
-        if (dueInput) dueInput.value = due.toFixed(2);
-
-        if (emptyState) {
-            emptyState.hidden = rows.length > 0;
-        }
-    }
-
-    function bindRowEvents(row) {
-        if (!row) return;
-
-        const qtyInput = row.querySelector('input[name="items[][quantity]"]');
-        const unitPriceInput = row.querySelector('input[name="items[][unit_price]"]');
-        const discountRowInput = row.querySelector('input[name="items[][discount_value]"]');
-        const removeBtn = row.querySelector('[data-remove-row]');
-
-        [qtyInput, unitPriceInput, discountRowInput].forEach(function (input) {
-            if (input) {
-                input.addEventListener('input', recalculateCart);
-                input.addEventListener('change', recalculateCart);
-            }
-        });
-
-        if (removeBtn) {
-            removeBtn.addEventListener('click', function () {
-                row.remove();
-                recalculateCart();
-            });
-        }
-    }
-
-    function addProductToCart(product) {
-        if (!cartItems || !productCardTemplate) return;
-
-        const template = document.getElementById('salesCartRowTemplate');
-        if (!template) return;
-
-        const emptyState = cartItems.querySelector('[data-sales-empty]');
-
-        const clone = template.content.cloneNode(true);
-        const row = clone.querySelector('[data-sales-item]');
-        if (!row) return;
-
-        const productIdInput = row.querySelector('input[name="items[][product_id]"]');
-        const productUnitInput = row.querySelector('input[name="items[][product_unit_id]"]');
-        const batchInput = row.querySelector('input[name="items[][batch_id]"]');
-        const nameEl = row.querySelector('.sales-cart-item-name');
-        const metaEl = row.querySelector('.sales-cart-item-meta');
-        const qtyInput = row.querySelector('input[name="items[][quantity]"]');
-        const unitPriceInput = row.querySelector('input[name="items[][unit_price]"]');
-        const discountRowInput = row.querySelector('input[name="items[][discount_value]"]');
-        const stockEl = row.querySelector('.sales-cart-item-stock');
-
-        if (productIdInput) productIdInput.value = product.id || '';
-        if (productUnitInput) productUnitInput.value = product.default_sale_unit_id || '';
-        if (batchInput) batchInput.value = '';
-        if (nameEl) nameEl.textContent = product.name || 'بدون اسم';
-
-        if (metaEl) {
-            const metaParts = [];
-            if (product.code) metaParts.push('الكود: ' + product.code);
-            if (product.category_name) metaParts.push(product.category_name);
-            if (product.sale_unit_label) metaParts.push('الوحدة: ' + product.sale_unit_label);
-            metaEl.textContent = metaParts.join(' • ');
-        }
-
-        if (qtyInput) qtyInput.value = 1;
-        if (unitPriceInput) unitPriceInput.value = getProductPrice(product).toFixed(2);
-        if (discountRowInput) discountRowInput.value = 0;
-        if (stockEl) stockEl.textContent = product.sale_unit_label ? ('وحدة البيع: ' + product.sale_unit_label) : '';
-
-        cartItems.appendChild(clone);
-
-        const addedRow = cartItems.querySelectorAll('[data-sales-item]');
-        const lastRow = addedRow[addedRow.length - 1];
-        bindRowEvents(lastRow);
-
-        if (emptyState) {
-            emptyState.hidden = true;
-        }
-
-        recalculateCart();
-    }
-
-    if (productsMoreBtn) {
-        productsMoreBtn.addEventListener('click', renderMoreProducts);
-    }
-
-    if (productSearchInput) {
-        productSearchInput.addEventListener('input', filterProducts);
-    }
-
+    
+    if (productsMoreBtn) productsMoreBtn.addEventListener('click', renderMoreProducts);
+    if (productSearchInput) productSearchInput.addEventListener('input', filterProducts);
     if (pricingTierSelect) {
-        pricingTierSelect.addEventListener('change', function () {
+        pricingTierSelect.addEventListener('change', function() {
             if (productsGrid) {
-                productsGrid.querySelectorAll('[data-sales-product]').forEach(function (card) {
+                productsGrid.querySelectorAll('[data-sales-product]').forEach(function(card) {
                     try {
                         const product = JSON.parse(card.dataset.product || '{}');
                         const priceEl = card.querySelector('[data-price-target]');
-                        if (priceEl) {
-                            priceEl.textContent = getProductPrice(product).toFixed(2);
-                        }
-                    } catch (e) {}
+                        if (priceEl) priceEl.textContent = getProductPrice(product).toFixed(2);
+                    } catch(e) {}
                 });
             }
         });
     }
-
     if (categoryFilters) {
-        categoryFilters.addEventListener('click', function (event) {
+        categoryFilters.addEventListener('click', function(event) {
             const btn = event.target.closest('[data-category-filter]');
             if (!btn) return;
-
             activeCategory = btn.getAttribute('data-category-filter') || 'all';
-
-            categoryFilters.querySelectorAll('[data-category-filter]').forEach(function (chip) {
-                chip.classList.remove('active');
-            });
-
+            categoryFilters.querySelectorAll('[data-category-filter]').forEach(function(chip) { chip.classList.remove('active'); });
             btn.classList.add('active');
             filterProducts();
         });
     }
-
+    
     const clearCartBtn = document.querySelector('[data-sales-clear]');
     if (clearCartBtn && cartItems) {
-        clearCartBtn.addEventListener('click', function () {
-            cartItems.querySelectorAll('[data-sales-item]').forEach(function (item) {
-                item.remove();
-            });
+        clearCartBtn.addEventListener('click', function() {
+            cartItems.querySelectorAll('[data-sales-item]').forEach(function(item) { item.remove(); });
             recalculateCart();
         });
     }
-
+    
     const discountInput = document.querySelector('input[name="discount_value"]');
     const paidInput = document.querySelector('input[name="paid_amount"]');
-
     if (discountInput) {
         discountInput.addEventListener('input', recalculateCart);
         discountInput.addEventListener('change', recalculateCart);
     }
-
     if (paidInput) {
         paidInput.addEventListener('input', recalculateCart);
         paidInput.addEventListener('change', recalculateCart);
     }
-
-    // عميل سريع
-    const toggleQuickCustomerBtn = document.querySelector('[data-toggle-customer-quick-form]');
-    const closeQuickCustomerBtn = document.querySelector('[data-close-customer-quick-form]');
-    const quickCustomerPanel = document.querySelector('[data-customer-quick-panel]');
-
-    if (toggleQuickCustomerBtn && quickCustomerPanel) {
-        toggleQuickCustomerBtn.addEventListener('click', function () {
-            quickCustomerPanel.hidden = false;
-            syncQuickCustomerMarketer();
-        });
-    }
-
-    if (closeQuickCustomerBtn && quickCustomerPanel) {
-        closeQuickCustomerBtn.addEventListener('click', function () {
-            quickCustomerPanel.hidden = true;
-        });
-    }
-
-    // --------------------------------------
-    // حفظ العميل السريع واختياره (Quick Customer Save & Select)
-    // --------------------------------------
-    const saveQuickCustomerBtn = document.querySelector('[data-save-quick-customer]');
-    const quickCustomerFormFields = {
-        fullName: document.querySelector('input[name="quick_customer_full_name"]'),
-        phone: document.querySelector('input[name="quick_customer_phone"]'),
-        category: document.querySelector('input[name="quick_customer_category"]'),
-        creditLimit: document.querySelector('input[name="quick_customer_credit_limit"]'),
-        marketerId: document.querySelector('input[name="quick_customer_marketer_id"]')
-    };
-
-    if (saveQuickCustomerBtn) {
-        saveQuickCustomerBtn.addEventListener('click', function () {
-            const fullName = quickCustomerFormFields.fullName ? quickCustomerFormFields.fullName.value.trim() : '';
-            const phone = quickCustomerFormFields.phone ? quickCustomerFormFields.phone.value.trim() : '';
-            const category = quickCustomerFormFields.category ? quickCustomerFormFields.category.value.trim() : '';
-            const creditLimit = quickCustomerFormFields.creditLimit ? quickCustomerFormFields.creditLimit.value : 0;
-            const marketerId = quickCustomerFormFields.marketerId ? quickCustomerFormFields.marketerId.value : '';
-
-            if (!fullName) {
-                showToast('برجاء إدخال اسم العميل', 'error', 'خطأ');
-                if (quickCustomerFormFields.fullName) quickCustomerFormFields.fullName.focus();
-                return;
-            }
-
-            // Disable button during save
-            saveQuickCustomerBtn.disabled = true;
-            const originalHtml = saveQuickCustomerBtn.innerHTML;
-            saveQuickCustomerBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
-            const formData = new FormData();
-            formData.append('full_name', fullName);
-            if (phone) formData.append('phone', phone);
-            if (category) formData.append('category', category);
-            formData.append('credit_limit', creditLimit);
-            if (marketerId) formData.append('marketer_id', marketerId);
-            formData.append('status', 'active');
-            formData.append('quick_create', '1');
-            formData.append('csrf', document.querySelector('[name="csrf"]') ? document.querySelector('[name="csrf"]').value : '');
-
-            fetch('ajax/customers/save.php', {
-                method: 'POST',
-                body: formData,
-                credentials: 'same-origin'
-            })
-            .then(r => r.json())
-            .then(result => {
-                if (result.success && result.data && result.data.id) {
-                    showToast(result.message || 'تم حفظ العميل بنجاح', 'success', 'نجاح');
-
-                    // Add customer to select dropdown
-                    if (customerSelect) {
-                        const option = document.createElement('option');
-                        option.value = result.data.id;
-                        option.textContent = result.data.full_name || fullName;
-                        if (result.data.marketer_id) {
-                            option.dataset.marketerId = result.data.marketer_id;
-                        }
-                        customerSelect.appendChild(option);
-                        customerSelect.value = result.data.id;
-                        customerSelect.dispatchEvent(new Event('change'));
-                    }
-
-                    // Clear form fields
-                    if (quickCustomerFormFields.fullName) quickCustomerFormFields.fullName.value = '';
-                    if (quickCustomerFormFields.phone) quickCustomerFormFields.phone.value = '';
-                    if (quickCustomerFormFields.category) quickCustomerFormFields.category.value = '';
-                    if (quickCustomerFormFields.creditLimit) quickCustomerFormFields.creditLimit.value = 0;
-                    if (quickCustomerFormFields.marketerId) quickCustomerFormFields.marketerId.value = '';
-
-                    // Hide quick customer panel
-                    if (quickCustomerPanel) {
-                        quickCustomerPanel.hidden = true;
-                    }
-
-                } else {
-                    showToast(result.message || 'حدث خطأ أثناء حفظ العميل', 'error', 'خطأ');
-                }
-            })
-            .catch(err => {
-                console.error('Save customer error:', err);
-                showToast('خطأ في الاتصال بالخادم', 'error', 'خطأ');
-            })
-            .finally(() => {
-                saveQuickCustomerBtn.disabled = false;
-                saveQuickCustomerBtn.innerHTML = originalHtml;
-            });
-        });
-    }
-
-                    // إعادة المحاولة تلقائياً في أول دخول لو المنتجات لم تظهر
+    
     salesProducts = parseProductsData();
-
     if (productsGrid) {
         if (!Array.isArray(salesProducts) || salesProducts.length === 0) {
             const retryKey = 'sales_pos_retry_once';
-
             if (!sessionStorage.getItem(retryKey)) {
                 sessionStorage.setItem(retryKey, '1');
-                setTimeout(function () {
-                    window.location.reload();
-                }, 400);
+                setTimeout(function() { window.location.reload(); }, 400);
                 return;
             } else {
                 sessionStorage.removeItem(retryKey);
             }
-
             productsGrid.innerHTML = '';
             if (productsEmpty) {
                 productsEmpty.hidden = false;
                 productsEmpty.textContent = 'تعذر تحميل الأصناف. راجع بيانات المنتجات أو تحميل الصفحة.';
             }
-            if (productsMoreBtn) {
-                productsMoreBtn.hidden = true;
-            }
+            if (productsMoreBtn) productsMoreBtn.hidden = true;
         } else {
             sessionStorage.removeItem('sales_pos_retry_once');
             filterProducts();
         }
     }
-
-
+    
     const toggleBtn = document.getElementById('toggleFilters');
     const filterPanel = document.getElementById('filterPanel');
     const filterForm = document.getElementById('salesFilterForm');
-
     if (toggleBtn && filterPanel) {
-        const hasActiveFilters = Array.from(filterPanel.querySelectorAll('input, select')).some(function (el) {
-            if (el.name === 'module' || el.name === 'search') {
-                return false;
-            }
-
+        const hasActiveFilters = Array.from(filterPanel.querySelectorAll('input, select')).some(function(el) {
+            if (el.name === 'module' || el.name === 'search') return false;
             const val = el.value;
-
-            if (el.type === 'text' || el.type === 'number' || el.type === 'date') {
-                return val !== '';
-            }
-
-            if (el.tagName === 'SELECT') {
-                return val !== '0' && val !== '';
-            }
-
+            if (el.type === 'text' || el.type === 'number' || el.type === 'date') return val !== '';
+            if (el.tagName === 'SELECT') return val !== '0' && val !== '';
             return false;
         });
-
         if (hasActiveFilters) {
             filterPanel.style.display = 'block';
             toggleBtn.classList.add('active');
         }
-
-        toggleBtn.addEventListener('click', function () {
+        toggleBtn.addEventListener('click', function() {
             const isHidden = filterPanel.style.display === 'none' || filterPanel.style.display === '';
             filterPanel.style.display = isHidden ? 'block' : 'none';
             toggleBtn.classList.toggle('active', isHidden);
-
-            const icon = toggleBtn.querySelector('i');
-            if (icon) {
-                icon.className = isHidden ? 'fa-solid fa-sliders' : 'fa-solid fa-rotate-left';
-            }
         });
     }
-
-    const resetLink = filterForm ? filterForm.querySelector('a[href="index.php?module=sales"]') : null;
-    if (resetLink && filterForm) {
-        resetLink.addEventListener('click', function (e) {
-            e.preventDefault();
-
-            filterForm.querySelectorAll('input, select').forEach(function (el) {
-                if (el.name === 'module') {
-                    return;
-                }
-
-                if (el.type === 'text' || el.type === 'number' || el.type === 'date') {
-                    el.value = '';
-                } else if (el.tagName === 'SELECT') {
-                    el.value = el.options[0] ? el.options[0].value : '';
-                }
-            });
-
-            filterForm.submit();
-        }
-    }
-
-    // -----------------------------
-    // Sales POS: Enhanced UX
-    // -----------------------------
+    
     const salesForm = document.querySelector('form[data-sales-pos]');
     const pageLoading = document.getElementById('pageLoading');
     const saveBtn = document.getElementById('saveSaleBtn');
-
     if (salesForm) {
-        // Show loading overlay on form submit
-        salesForm.addEventListener('submit', function (e) {
+        salesForm.addEventListener('submit', function(e) {
             if (!salesForm.checkValidity()) return;
             e.preventDefault();
-
             if (pageLoading) pageLoading.hidden = false;
             if (saveBtn) {
                 saveBtn.disabled = true;
-                saveBtn.classList.add('is-loading');
                 saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>جاري الحفظ...</span>';
             }
-
-            // Submit via AJAX (using existing data-ajax-form handler)
             const formData = new FormData(salesForm);
             fetch(salesForm.action, {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin'
             })
-            .then(r => r.json())
-            .then(result => {
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
                 if (result.success) {
-                    showToast(result.message || 'تم حفظ الفاتورة بنجاح', 'success', 'نجح');
-                    // Optionally redirect or clear form
-                    if (result.data && result.data.id) {
-                        setTimeout(() => {
-                            window.location.href = 'index.php?module=sales';
-                        }, 800);
-                    }
+                    showToast(result.message || 'تم حفظ الفاتورة بنجاح', 'success', 'نجاح');
+                    setTimeout(function() { window.location.href = 'index.php?module=sales'; }, 800);
                 } else {
                     showToast(result.message || 'حدث خطأ أثناء الحفظ', 'error', 'خطأ');
                     if (pageLoading) pageLoading.hidden = true;
                     if (saveBtn) {
                         saveBtn.disabled = false;
-                        saveBtn.classList.remove('is-loading');
                         saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i><span>حفظ الفاتورة</span>';
                     }
                 }
             })
-            .catch(err => {
+            .catch(function(err) {
                 console.error('Submit error:', err);
                 showToast('خطأ في الاتصال بالخادم', 'error', 'خطأ');
                 if (pageLoading) pageLoading.hidden = true;
                 if (saveBtn) {
                     saveBtn.disabled = false;
-                    saveBtn.classList.remove('is-loading');
                     saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i><span>حفظ الفاتورة</span>';
                 }
             });
         });
     }
-
-    // Flash animation when product is added to cart
-    document.addEventListener('click', function (e) {
+    
+    document.addEventListener('click', function(e) {
         if (e.target.closest('[data-sales-product]')) {
             const card = e.target.closest('.sales-product-card');
             if (card) {
                 card.classList.add('is-flash');
-                setTimeout(() => card.classList.remove('is-flash'), 600);
+                setTimeout(function() { card.classList.remove('is-flash'); }, 600);
             }
         }
     });
-
-    // Flash animation when cart item is added (via mutation observer)
-    const cartItems = document.getElementById('salesItems');
+    
     if (cartItems) {
-        const observer = new MutationObserver(function (mutations) {
-            mutations.forEach(function (m) {
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(m) {
                 if (m.addedNodes.length) {
-                    m.addedNodes.forEach(function (node) {
-                        if (node.nodeType === 1 && node.classList.contains('sales-cart-item')) {
+                    m.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1 && node.classList && node.classList.contains('sales-cart-item')) {
                             node.classList.add('is-new');
-                            setTimeout(() => node.classList.remove('is-new'), 800);
+                            setTimeout(function() { node.classList.remove('is-new'); }, 800);
                         }
                     });
                 }
@@ -1644,3 +1712,4 @@ document.addEventListener('DOMContentLoaded', function () {
         observer.observe(cartItems, { childList: true });
     }
 });
+</script>

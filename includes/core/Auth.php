@@ -122,20 +122,18 @@ class Auth
         }
     }
 
-    public static function can(string $permission): bool
-    {
-        if (!self::check()) {
-            return false;
-        }
-
-        // Super admin has all permissions
-        if (self::isSuperAdmin()) {
-            return true;
-        }
-
-        return isset(self::$permissions[$permission]);
+   public static function can(string $permission): bool
+{
+    if (!self::check()) {
+        return false;
     }
 
+    if (self::isSuperAdmin()) {
+        return true;
+    }
+
+    return (self::$permissions[$permission] ?? false) === true;
+}
     public static function requirePermission(string $permission): void
     {
         if (!self::can($permission)) {
@@ -251,54 +249,89 @@ class Auth
     }
 
     private static function loadPermissions(int $roleId, int $userId): array
-    {
-        if (
-            !schema_table_exists('permissions')
-            || !schema_table_exists('user_role_permissions')
-            || !schema_has_column('user_role_permissions', 'permission_id')
-            || !schema_has_column('user_role_permissions', 'role_id')
-        ) {
-            return [];
-        }
-
-        $stmt = Database::connection()->prepare(
-            'SELECT CONCAT(p.module_key, ".", p.action_key) AS permission_key
-             FROM user_role_permissions urp
-             INNER JOIN permissions p ON p.id = urp.permission_id
-             WHERE urp.role_id = :role_id'
-        );
-        $stmt->execute(['role_id' => $roleId]);
-
-        $permissions = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $permission) {
-            $permissions[$permission] = true;
-        }
-
-        try {
-            if (
-                schema_table_exists('user_permissions')
-                && schema_has_column('user_permissions', 'permission_id')
-                && schema_has_column('user_permissions', 'user_id')
-                && schema_has_column('user_permissions', 'is_allowed')
-            ) {
-                $userStmt = Database::connection()->prepare(
-                    'SELECT CONCAT(p.module_key, ".", p.action_key) AS permission_key, up.is_allowed
-                     FROM user_permissions up
-                     INNER JOIN permissions p ON p.id = up.permission_id
-                     WHERE up.user_id = :user_id'
-                );
-                $userStmt->execute(['user_id' => $userId]);
-
-                foreach ($userStmt->fetchAll() as $row) {
-                    $permissions[$row['permission_key']] = (int) $row['is_allowed'] === 1;
-                }
-            }
-        } catch (Throwable $e) {
-        }
-
-        return $permissions;
+{
+    if (
+        !schema_table_exists('permissions')
+        || !schema_has_column('permissions', 'id')
+        || !schema_has_column('permissions', 'module_key')
+        || !schema_has_column('permissions', 'action_key')
+    ) {
+        return [];
     }
 
+    $permissions = [];
+
+    $allStmt = Database::connection()->query(
+        'SELECT id, CONCAT(module_key, ".", action_key) AS permission_key FROM permissions'
+    );
+
+    $allPermissions = $allStmt->fetchAll();
+
+    foreach ($allPermissions as $permission) {
+        $permissions[$permission['permission_key']] = false;
+    }
+
+    /*
+     * الأهم:
+     * لو عند المستخدم صلاحيات محفوظة في user_permissions
+     * نعتمد عليها فقط ولا نرجع لصلاحيات الدور.
+     */
+    if (
+        schema_table_exists('user_permissions')
+        && schema_has_column('user_permissions', 'user_id')
+        && schema_has_column('user_permissions', 'permission_id')
+        && schema_has_column('user_permissions', 'is_allowed')
+    ) {
+        $checkStmt = Database::connection()->prepare(
+            'SELECT COUNT(*) FROM user_permissions WHERE user_id = :user_id'
+        );
+        $checkStmt->execute(['user_id' => $userId]);
+
+        if ((int) $checkStmt->fetchColumn() > 0) {
+            $userStmt = Database::connection()->prepare(
+                'SELECT 
+                    CONCAT(p.module_key, ".", p.action_key) AS permission_key,
+                    up.is_allowed
+                 FROM user_permissions up
+                 INNER JOIN permissions p ON p.id = up.permission_id
+                 WHERE up.user_id = :user_id'
+            );
+
+            $userStmt->execute(['user_id' => $userId]);
+
+            foreach ($userStmt->fetchAll() as $row) {
+                $permissions[$row['permission_key']] = ((int) $row['is_allowed'] === 1);
+            }
+
+            return $permissions;
+        }
+    }
+
+    /*
+     * لو المستخدم ما عنداش صلاحيات خاصة محفوظة،
+     * نستخدم صلاحيات الدور.
+     */
+    if (
+        schema_table_exists('role_permissions')
+        && schema_has_column('role_permissions', 'role_id')
+        && schema_has_column('role_permissions', 'permission_id')
+    ) {
+        $roleStmt = Database::connection()->prepare(
+            'SELECT CONCAT(p.module_key, ".", p.action_key) AS permission_key
+             FROM role_permissions rp
+             INNER JOIN permissions p ON p.id = rp.permission_id
+             WHERE rp.role_id = :role_id'
+        );
+
+        $roleStmt->execute(['role_id' => $roleId]);
+
+        foreach ($roleStmt->fetchAll() as $row) {
+            $permissions[$row['permission_key']] = true;
+        }
+    }
+
+    return $permissions;
+}
     private static function loadBranchIds(int $userId, ?int $defaultBranchId = null): array
     {
         $branchIds = [];
